@@ -1,0 +1,265 @@
+#!/usr/bin/env python3
+"""Assembles one documentation site from the doc/ of every Sokar repository.
+
+The list of repositories, and their order, is sokar-project's project.yml: its `repositories`, each with the
+`upstream` it is reached at. For each, the documentation of its newest release (a tag `v<version>`) is taken, or
+of its default branch while it has none - and the page says which. A repository with no doc/ is left out and
+named in the log.
+
+A section's order is the `nav` of that repository's own mkdocs.yml, when it has one; otherwise its index.md, then
+its other pages by name. A relative link that leaves doc/ (to the README, to issues/) would be dead on the site,
+so it is turned into a link to that file in the repository, at the commit the section was built from.
+
+Reads only. While the repositories are private, SOKAR_DOCS_READ (a token that can read them and nothing else) is
+used, given to git through the environment, never on a command line; once they are public it is not needed, and a
+repository that cannot be read is left out and named in the log.
+
+    assemble.py --out WORK [--project-yml FILE] [--local NAME=PATH ...] [--branch-only]
+"""
+
+import argparse
+import base64
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import urllib.request
+
+import yaml
+
+ORG = "sokar-ai"
+SELF = "sokar-ai.github.io"
+PROJECT = "sokar-project"
+SITE_URL = "https://sokar-ai.github.io/"
+
+
+def log(message):
+    print(message, file=sys.stderr, flush=True)
+
+
+def git_env():
+    """git's environment: the read token as a header when there is one, and never a prompt for a password."""
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+    token = os.environ.get("SOKAR_DOCS_READ", "")
+    if token:
+        basic = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+        env.update(GIT_CONFIG_COUNT="1", GIT_CONFIG_KEY_0="http.https://github.com/.extraheader",
+                   GIT_CONFIG_VALUE_0=f"AUTHORIZATION: basic {basic}")
+    return env
+
+
+def git(*args, cwd=None):
+    return subprocess.run(["git", *args], cwd=cwd, env=git_env(), check=True, capture_output=True,
+                          text=True).stdout
+
+
+def project_yml(path):
+    if path:
+        with open(path, encoding="utf-8") as file:
+            return yaml.safe_load(file)
+    request = urllib.request.Request(f"https://api.github.com/repos/{ORG}/{PROJECT}/contents/project.yml",
+                                     headers={"Accept": "application/vnd.github.raw+json"})
+    token = os.environ.get("SOKAR_DOCS_READ", "")
+    if token:
+        request.add_header("Authorization", f"Bearer {token}")
+    with urllib.request.urlopen(request, timeout=30) as response:
+        return yaml.safe_load(response.read())
+
+
+def https(upstream):
+    """git@github.com:org/name.git and https://github.com/org/name(.git) alike, as an https address."""
+    match = re.match(r"(?:git@github\.com:|https://github\.com/)([^/]+/[^/]+?)(?:\.git)?/?$", upstream or "")
+    return f"https://github.com/{match.group(1)}.git" if match else None
+
+
+def parts(project):
+    """Every repository the project names, in its order: the project's own repository first."""
+    found = [(PROJECT, f"https://github.com/{ORG}/{PROJECT}.git", (project.get("project") or {}).get("description", ""))]
+    for name, repository in (project.get("repositories") or {}).items():
+        url = https((repository or {}).get("upstream"))
+        if url is None:
+            log(f"skipped {name}: no GitHub upstream in project.yml")
+            continue
+        found.append((name, url, (repository or {}).get("description", "")))
+    return [part for part in found if not part[1].endswith(f"/{SELF}.git")]
+
+
+def version(tag):
+    return tuple(int(n) for n in re.findall(r"\d+", tag))
+
+
+def newest_release(url):
+    """The newest tag v<version>, as (tag, commit), or None."""
+    lines = git("ls-remote", "--tags", "--refs", url, "v*").splitlines()
+    tags = [(line.split("\t")[1].removeprefix("refs/tags/"), line.split("\t")[0]) for line in lines if "\t" in line]
+    tags = [tag for tag in tags if re.fullmatch(r"v\d+(\.\d+)*", tag[0])]
+    return max(tags, key=lambda tag: version(tag[0])) if tags else None
+
+
+def fetch(name, url, where, branch_only):
+    """Checks a repository out into `where`, at its newest release or its default branch; returns what was taken."""
+    release = None if branch_only else newest_release(url)
+    ref = release[0] if release else "HEAD"
+    git("init", "-q", where)
+    git("fetch", "-q", "--depth=1", url, ref, cwd=where)
+    git("checkout", "-q", "FETCH_HEAD", cwd=where)
+    commit = git("rev-parse", "HEAD", cwd=where).strip()
+    return {"name": name, "ref": release[0] if release else "main", "release": release is not None,
+            "commit": commit}
+
+
+# What a page shows besides its text. Anything else in doc/ - a walk's JSON, a fixture - is not for the site.
+ASSETS = (".png", ".svg", ".jpg", ".jpeg", ".gif", ".webp")
+
+LINK = re.compile(r"(\]\()([^)\s]+)(\))")
+
+
+def relinked(text, page, doc, repository, commit):
+    """Links that leave doc/ point at the file in the repository, at the commit the section was built from."""
+
+    def one(match):
+        target = match.group(2)
+        if re.match(r"^[a-z][a-z0-9+.-]*:|^#|^/", target):
+            return match.group(0)
+        path, _, anchor = target.partition("#")
+        resolved = os.path.normpath(os.path.join(os.path.dirname(page), path))
+        if resolved == os.path.normpath(doc) or resolved.startswith(os.path.normpath(doc) + os.sep):
+            return match.group(0)
+        relative = os.path.relpath(resolved, os.path.dirname(doc))
+        return (f"{match.group(1)}https://github.com/{ORG}/{repository}/blob/{commit}/{relative}"
+                f"{'#' + anchor if anchor else ''}{match.group(3)}")
+
+    return LINK.sub(one, text)
+
+
+def nav_of(checkout, name):
+    """The section's order: the repository's own mkdocs.yml nav, prefixed with its directory here."""
+    own = os.path.join(checkout, "mkdocs.yml")
+    if os.path.isfile(own):
+        with open(own, encoding="utf-8") as file:
+            config = yaml.load(file, Loader=yaml.BaseLoader) or {}
+        if config.get("nav"):
+            return prefixed(config["nav"], name)
+    pages = sorted(page for page in os.listdir(os.path.join(checkout, "doc")) if page.endswith(".md"))
+    if "index.md" in pages:
+        pages.remove("index.md")
+        pages.insert(0, "index.md")
+    return [f"{name}/{page}" for page in pages]
+
+
+def first_page(nav):
+    if isinstance(nav, str):
+        return nav
+    for entry in (nav if isinstance(nav, list) else nav.values()):
+        found = first_page(entry)
+        if found:
+            return found
+    return None
+
+
+def prefixed(nav, name):
+    if isinstance(nav, str):
+        return nav if re.match(r"^[a-z]+://", nav) else f"{name}/{nav}"
+    if isinstance(nav, list):
+        return [prefixed(entry, name) for entry in nav]
+    return {title: prefixed(entry, name) for title, entry in nav.items()}
+
+
+def assemble(out, project, local, branch_only):
+    docs = os.path.join(out, "docs")
+    shutil.rmtree(out, ignore_errors=True)
+    os.makedirs(docs)
+    # Every repository read, with or without doc/: what an hourly run compares, so one with nothing to show does not
+    # look changed at every hour.
+    built, considered, nav = [], [], [{"Sokar": "index.md"}]
+    for name, url, description in parts(project):
+        checkout = os.path.join(out, "repositories", name)
+        if name in local:
+            shutil.copytree(local[name], checkout, ignore=shutil.ignore_patterns(".git", "target", ".worktrees"))
+            taken = {"name": name, "ref": "local", "release": False, "commit": "local"}
+        else:
+            try:
+                taken = fetch(name, url, checkout, branch_only)
+            except subprocess.CalledProcessError as failed:
+                # One repository that cannot be read must not leave the site unbuilt, nor hide that it is missing.
+                log(f"skipped {name}: {failed.stderr.strip() or failed}")
+                continue
+        considered.append({k: taken[k] for k in ("name", "ref", "commit")})
+        doc = os.path.join(checkout, "doc")
+        if not os.path.isdir(doc):
+            log(f"skipped {name}: no doc/ at {taken['ref']}")
+            continue
+        repository = url.rsplit("/", 1)[1].removesuffix(".git")
+        for root, _, files in os.walk(doc):
+            for file in files:
+                source = os.path.join(root, file)
+                target = os.path.join(docs, name, os.path.relpath(source, doc))
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                if file.endswith(".md"):
+                    with open(source, encoding="utf-8") as read:
+                        text = relinked(read.read(), source, doc, repository, taken["commit"])
+                    with open(target, "w", encoding="utf-8") as write:
+                        write.write(text)
+                elif file.lower().endswith(ASSETS):
+                    shutil.copyfile(source, target)
+        taken.update(repository=repository, description=description or "")
+        built.append(taken)
+        section = nav_of(checkout, name)
+        taken["first"] = first_page(section)
+        nav.append({name: section})
+    with open(os.path.join(docs, "index.md"), "w", encoding="utf-8") as index:
+        index.write(landing(built))
+    with open(os.path.join(docs, "parts.json"), "w", encoding="utf-8") as manifest:
+        json.dump(considered, manifest, indent=1)
+    config = {"site_name": "Sokar", "site_url": SITE_URL, "repo_url": f"https://github.com/{ORG}",
+              "docs_dir": "docs", "site_dir": "site", "theme": "readthedocs", "strict": True,
+              "nav": nav}
+    with open(os.path.join(out, "mkdocs.yml"), "w", encoding="utf-8") as file:
+        yaml.safe_dump(config, file, sort_keys=False, allow_unicode=True)
+    return built
+
+
+def landing(built):
+    lines = ["# Sokar", "",
+             "Sokar runs AI coding agents in containers they cannot leave. This site holds the documentation of",
+             "every part of it, each taken from its own repository.", "",
+             "| Part | What it is | Taken from |", "|---|---|---|"]
+    for part in built:
+        source = (f"release {part['ref']}" if part["release"]
+                  else f"`{part['ref']}` at `{part['commit'][:12]}`, not released yet")
+        lines.append(f"| [{part['name']}]({part['first']}) | {part['description']} | {source} |")
+    return "\n".join(lines) + "\n"
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--out", required=True, help="the working directory, emptied first")
+    parser.add_argument("--project-yml", help="read this file instead of sokar-project's on GitHub")
+    parser.add_argument("--local", action="append", default=[], metavar="NAME=PATH",
+                        help="take a repository from a checkout here instead of GitHub")
+    parser.add_argument("--branch-only", action="store_true", help="take default branches, not releases")
+    parser.add_argument("--manifest", action="store_true",
+                        help="print only what would be taken, as parts.json says it, and build nothing")
+    args = parser.parse_args()
+    project = project_yml(args.project_yml)
+    if args.manifest:
+        taken = []
+        for name, url, _ in parts(project):
+            try:
+                release = None if args.branch_only else newest_release(url)
+                ref = release[0] if release else "main"
+                commit = release[1] if release else git("ls-remote", url, "HEAD").split("\t")[0]
+                taken.append({"name": name, "ref": ref, "commit": commit})
+            except subprocess.CalledProcessError as failed:
+                log(f"skipped {name}: {failed.stderr.strip() or failed}")
+        print(json.dumps(taken, indent=1))
+        return
+    local = dict(entry.split("=", 1) for entry in args.local)
+    for part in assemble(args.out, project, local, args.branch_only):
+        log(f"took {part['name']} at {part['ref']} ({part['commit'][:12]})")
+
+
+if __name__ == "__main__":
+    main()

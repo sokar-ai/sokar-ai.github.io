@@ -1,0 +1,127 @@
+# Builds https://sokar-ai.github.io from the doc/ of every repository sokar-project's project.yml names, checks it
+# strict, and publishes it with GitHub Pages once publishing is switched on.
+#
+# When: every night and by hand, always; every hour, only when a repository's newest release - or, while it has
+# none, its default branch - moved since the last build. That is how a release reaches the site within the hour
+# without any other repository holding a token that could write here.
+#
+# Publishing is off until the repositories are public (PJ18; the operator, 2026-10-04): the site is built and
+# checked from now on, and published only where the repository variable PUBLISH is 'true'. Until then the
+# repositories are read with SOKAR_DOCS_READ, a fine-grained token with Contents: read on them and nothing else;
+# once they are public the token goes, and so does every line that names it.
+name: Site
+
+on:
+  schedule:
+    - cron: '23 2 * * *'
+    - cron: '7 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# One at a time, and a run that started is let finish.
+concurrency:
+  group: site
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.decide.outputs.changed }}
+      key: ${{ steps.compare.outputs.key }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: The pinned tools, every package by its hash
+        run: python -m pip install --no-deps --require-hashes -r build/requirements.txt
+
+      - name: What would be taken now
+        id: compare
+        env:
+          SOKAR_DOCS_READ: ${{ secrets.SOKAR_DOCS_READ }}
+        run: |
+          python build/assemble.py --out "$RUNNER_TEMP/unused" --manifest > now.json
+          echo "key=site-$(sha256sum now.json | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      # The last build leaves its manifest's key in the cache; an hourly run that finds it has nothing new to build.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: built
+        with:
+          path: now.json
+          key: ${{ steps.compare.outputs.key }}
+          lookup-only: true
+
+      - name: Whether anything moved since the last build
+        id: decide
+        env:
+          HOURLY: ${{ github.event.schedule == '7 * * * *' }}
+          FOUND: ${{ steps.built.outputs.cache-hit }}
+        run: |
+          if [ "$HOURLY" = true ] && [ "$FOUND" = true ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Nothing moved since the last build."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.changed != 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: The pinned tools, every package by its hash
+        run: python -m pip install --no-deps --require-hashes -r build/requirements.txt
+
+      - name: Every repository's doc/, in sokar-project's order
+        env:
+          SOKAR_DOCS_READ: ${{ secrets.SOKAR_DOCS_READ }}
+        run: python build/assemble.py --out "$RUNNER_TEMP/site"
+
+      - name: The site, strict
+        run: mkdocs build --strict --config-file "$RUNNER_TEMP/site/mkdocs.yml"
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: ${{ runner.temp }}/site/site
+
+      - name: What this build took, for the next hourly run to compare with
+        run: cp "$RUNNER_TEMP/site/site/parts.json" now.json
+
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: now.json
+          key: ${{ needs.check.outputs.key }}
+
+  publish:
+    needs: build
+    # Off until PJ18: set the repository variable PUBLISH to 'true' once the repositories are public.
+    if: github.ref == 'refs/heads/main' && vars.PUBLISH == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

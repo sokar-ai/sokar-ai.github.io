@@ -1,156 +1,235 @@
 # Working on sokar-ai.github.io
 
-How the site of all Sokar documentation is put together. Owned by Agent Core (the operator, 2026-10-04); the
-requirement is `sokar-project` PJ21.
+How the site of all Sokar documentation is put together.
 
-- **No page is written here.** Documentation belongs in the `doc/` of the repository whose code it describes,
-  and is checked there. What is written here is how the pages are collected, ordered and published.
-- **Read the other repositories, never write them.** The workflow's token can read; the only thing it writes is
-  this repository's Pages.
-- **Before a commit:** build the site with `build/assemble.py` and `mkdocs build --strict` (see the README), and
-  run `check-actions` from `sokar-release` over `.github`: every `uses:` pinned to a commit with its version.
+- **No page is written here**: documentation lives in the `doc/` of the repository whose code it describes, and
+  this repository only collects, orders and publishes it.
+- **Before a commit, build the site** with `build/assemble.py` and `mkdocs build --strict`, as the README shows.
 
 ## Shared across the Sokar repositories
 
-The same text in every repository `project.yml` names. Change it in the channel first, not in
-one copy.
+> **BEGIN Shared Area** · sha256 `6f50f80a2fb6ec54` · changed 2026-10-05T09:30Z
 
-- **The operator pushes. Agents commit and stop.** A push starts a build that costs metered minutes
-  and can cancel one already running. Say what is ready and let the operator decide when.
-- **A rewrite is cheap only while the commits are yours alone. Ask the remote first.**
-  *The operator pushes. Agents commit and stop* - and stop includes stop amending, stop squashing,
-  stop rebasing. A commit stops being yours the moment it is pushed, and nothing tells you when that
-  happened except asking:
+Identical in every repository `project.yml` names. The markers carry the SHA-256 of the lines between
+them (the first 16 hex digits) and the UTC time that text last changed; change it in the channel
+first, never in one copy.
 
-      git ls-remote origin refs/heads/main            the tip, and it cannot be stale
-      git merge-base --is-ancestor <commit> <tip>     whether the commit is already in it
+### Agents and the rules they follow
 
-  `origin/main` and `@{u}` are caches and answer a question about your last fetch. An amend after a
-  push leaves two commits with one parent and one subject on two sides, and the operator meets it as
-  a merge conflict. **The repair is never a force push** - reset onto the remote's commit and
-  re-apply as a new one, because the side that pushes is the side whose history is real. That same
-  reset is also the only safe way to squash, which is why the cure and the correct method are one
-  operation.
-- **Everyone stays in their own repository and asks for what they need from another.** An agent
-  neither reads nor writes another agent's repository - what it needs from there, it asks that
-  repository's agent for in the channel, with the reason. The one exception is the coordinating
-  agent, who may **read** the other repositories. Reading does not replace asking: a file shows what
-  is the case, and only the agent who wrote it knows why. **Writing is always the job of the agent
-  responsible for the repository**, with no exception.
-- **The channel is append-only.** An entry begins with `## <UTC timestamp> — <agent>`. Headings
-  inside an entry are free; scan for entries by the timestamp, never by `##` alone. Read
-  everything written since your marker before you post, move your marker only past somebody
-  else's entry, and never rewrite what is there. A question carries a prefix naming who is owed
-  the answer, so a reader scanning the file can see it.
-- **When quoting a document that has headings, indent it four spaces rather than fencing it.**
-  A fence hides them from a renderer and not from a scanner, and the channel is append-only, so
-  what a fence lets through cannot be taken out again.
-- **Re-read the channel immediately before appending to it.** An entry that landed between your
-  read and your append makes what you are about to write answer a state that no longer exists,
-  and the read that would have caught it costs nothing. The marker says what to compare against.
-- **Re-arm the watcher as the first thing after reading an entry**, before answering and before
-  building. A watcher that reports one change and exits is unarmed from that moment, and whatever
-  arrives while its reader is busy with work sits unread until somebody looks.
-- **The watcher stays armed while any work is open, and is re-armed every time it ends** - after an
-  entry and after a timeout alike, run with the longest background limit the tool allows. A watcher
-  that ran out with nothing new is not a reason to stop: an agent not listening holds up everyone
-  who waits on its answer, and nobody can tell it stopped. When one waits on the operator for
-  anything - a permission prompt, a decision - it says so in the channel at once, naming the exact
-  command, rather than waiting silently.
-- **Compare against a marker of what was actually read**, never against a fresh baseline taken when
-  you re-arm. A baseline adopts everything written between the read and the re-arm as already seen,
-  silently. Keep the last heading you read and compare against that.
-- **The file's order is the truth and the headings are a label.** An entry can sit behind ones
-  stamped later, because a heading is written when an entry is composed and the append happens when
-  it is finished. So take the timestamp at append time rather than at composition, **compare
-  against the position of the last entry you read rather than against its time**, and never sort
-  the channel by heading to reconstruct what happened.
-- **A secret never appears in a command line, and reaches a process through its environment or its
-  standard input.** Where one is stored, it is encrypted at rest and readable only by its owner -
-  and in CI it is never written to a filesystem at all.
-- **Every file fetched from Artifactory follows redirects** - `curl -L`, `jf rt curl -L`. A file
-  large enough is answered with a `302` to its cloud storage, and a fetch without `-L` gets an
-  empty body: the check passes for months and fails the day the file grows. Where "large enough"
-  lies is not known; a Debian index is past it. The `/api/` endpoints answer directly. Let `curl`
-  drop the credentials on that cross-host redirect - the storage URL is signed - and never pass
-  `--location-trusted`.
-- **The test machines are shared, and so is everything a run resolves from** - `~/.m2`,
-  `~/.sokar/handover/` and what a VM has installed. Name what you remove rather than sweeping
-  "what I do not recognise", **announce a restart before you trigger one**, and **announce a
-  change to any of these before you make it** - an install, a deploy, a replaced handover -
-  saying what replaces it and its hash, and wait while somebody's run is resolving from it. A
-  reboot leaves no trace in the work it interrupts, and a swapped artifact leaves none in the run
-  that used it: it passes, on something nobody meant to test.
-- **Say what a run does to a shared machine before starting it - what it does, not what you believe
-  it does.** Check first. A confident wrong answer costs somebody else an afternoon.
-- **Link to a requirement by its number and to the index, never to its file.** A pointer is
-  written for the day the thing it points at is gone, and it goes in more ways than one: a
-  finished requirement is deleted, an issue closed unbuilt is deleted, and a design document
-  recording an undecided question is deleted when the question is answered. A link to a file
-  breaks on all three; a link to the index breaks on none. **Where a repository can enforce
-  this with a test, it does** - without one, the defect is found by accident or not at all.
-- **From "both are valid" it does not follow that both should exist.** Two indexes, two markers,
-  two manifests, the same skills in two repositories - each is a correct fact with one inference
-  too many on top, and the second copy is always the one that quietly goes stale. When a thing is
-  right in two forms, publish one and say why.
-- **Measure before you claim.** "It works" means it was run. "It is not the cause" means the
-  counter-test was run too. A finding without a measurement is a guess wearing a fact's clothes.
-- **"I could not get X" is a claim about a method, not about the world**, and it is worth saying
-  out loud only once a second method has failed too. A page `curl` returns empty can be one whose
-  body is loaded afterwards, and a fetch that renders it answers in one call what the first method
-  called undeterminable.
-- **Two agents agreeing on an inference is not evidence** - it is one inference with two names on
-  it. Agreement counts when each measured separately; when the second agent takes the first's
-  observation and adds a reason, the reason has been reviewed by nobody. **Say which part you
-  measured and which part you inferred**, so the other can agree with one and not the other.
-- **An issue is one task.** If it needs two answers or two changes that could land separately, it
-  is two issues. A dependency on an issue in another Sokar repository is named in the issue, with
-  the repository and the number, so nobody discovers it by starting.
-- **The documentation language is US English** - issues, decisions, changelog, comments, commit
-  messages. The channel too.
-- **Do not refer to feature numbers in commit messages.** Just state what the feature is. A commit
-  says *"Start work in a chosen repository"*, not *"B67"* - the number means nothing to somebody
-  reading the history without the index beside it, and the index outlives the requirement by being
-  deleted when it is finished.
-- **Dot files and directories are not checked in.** `.gitignore` ignores `.*` and names only the
-  exceptions a build needs. Anything true of one machine goes in `.AGENTS.md`, which that rule
-  ignores by itself.
-- **A Java repository builds in one language.** Its build, checks, update job and tests run
-  through Java and Maven, and no build or workflow needs `python3`. A file that stays in another
-  language is named in that repository's `AGENTS.md`, with the reason it cannot be Java there or
-  in the file's own header - `mvnw` is the worked example: it is how a pinned Maven arrives
-  before any Java can run. And no repository carries a copy of a helper another one carries:
-  copies of one helper drift apart, and one grows a step the others lack. The drift is the
-  argument, not the tidiness.
-- **Java code is null-checked when it compiles.** Every package holding main code is
-  `@NullMarked` (JSpecify) from its first commit, and NullAway runs in the main compile as an
-  error, scoped by `OnlyNullMarked`. An unmarked package is skipped in silence, so a repository
-  keeps a test that fails on one.
-- **Documentation and rules say what is true now.** A README, `build.md`, everything under
-  `doc/` and `AGENTS.md` state what holds today - what the product does, how it is built, what
-  was measured, what an agent must do and why - with no dates, no "until", "since" or "used
-  to", no incident told as a story, and nobody named as the one who did, found, decided or
-  approved something, an agent no more than the operator. Where a rule gives somebody a duty,
-  it names the role: "the operator pushes", "the repository's agent", "the coordinating
-  agent". A rule keeps its reason, stated so that it stays true. How a thing came to be is in
-  the git history; the changelog and the issues record events on purpose and are not covered.
-  A dated sentence is stale the day after it is written, and nobody rereads it to find out.
-- **What a build runs is pinned, and moved only by review.** Every `uses:` names a commit with
-  its version beside it (`@<sha> # vX.Y.Z`), GitHub's own actions included; a JDK, a Maven
-  and an image are taken by version and checked against their digest, and the JDK comes from
-  `sokar-machines jdk --github`, never from a setup action that fetches one by its version
-  name. A tag or a branch is a name its owner may repoint, so what was reviewed and what runs
-  would differ. Dependabot moves the actions: `github-actions`, weekly, `cooldown:
-  default-days: 3`, every update in one group, watching `/` and `/.github/actions/*`, and
-  nothing merged automatically - the review is the point of a pin. `sokar-release
-  check-actions`, run in the build, refuses what breaks this, and no repository keeps a second
-  test for it. One pull request per update would be one CI run per update, and a release
-  younger than three days is not taken, as with every other pin here.
-- **Every native executable starts on any x86-64 CPU.** native-image is given
-  `-march=x86-64` - the baseline level by name (CMOV, CX8, FXSR, MMX, SSE, SSE2), never
-  `compatibility`, which is the tool's alias and the tool's to redefine, and never left out,
-  since the tool's default asks for AVX2 and FMA and such an executable refuses to start on an
-  older CPU. The repository's build holds each executable to exactly that set, read from the
-  executable itself, so a build that drifts goes red rather than shipping. A machine that
-  cannot run what is published is found by a user, not by the build.
+- **When several agents run in parallel, they may communicate through a shared channel.** How it
+  works depends on the local setup and is defined in the optional `.AGENTS.md` or fed into every
+  agent's context when it starts.
+- **Every repository has exactly one responsible agent, and one agent may be responsible for
+  several.** Which one is defined in the optional `.AGENTS.md` or fed into every agent's context when
+  it starts.
+- **A rule that holds for more than one repository is stated generally and shared** - here, or in the
+  shared block of `.AGENTS.md` if it concerns the local setup. A rule is one or two sentences and
+  says only what matters.
+- **A rule belongs in `.AGENTS.md` only if it concerns local settings that cannot be shared through
+  `AGENTS.md`.**
+- **An agent writes only in its own repositories and asks the responsible agent for anything from
+  another**, in the channel. The coordinating agent may also read the other repositories, but never
+  writes in them.
+- **Where a channel exists, an agent stays reachable on it while any work is open**, and says there at
+  once when it waits on the operator.
+- **A contract between repositories - an interface, a file format, a path another repository links
+  to - changes only after agreement in the channel or by an operator decision**, and in both
+  repositories.
+- **An ambiguous answer is asked about once, plainly, instead of guessed at.** When an answer
+  changes, everything built on the old one is looked for.
 
+### Commits and pushes
+
+- **While working, commit in logical steps, so a mistake can be rolled back.** A task is pushed only
+  when it is finished, squashed into one commit as its last step; several finished tasks may go out
+  in one push, one commit each.
+- **An edit replaces an exact block, never everything between two landmarks; only the files you
+  edited are formatted.** Before a commit, `git status` is read and only your own files are added,
+  never with `git add -A`.
+- **Unless the operator says otherwise, the operator pushes, and agents commit and stop.** An
+  instruction to push covers exactly what it names.
+- **A change that needs another repository's change names that dependency when it is handed over**,
+  and is pushed only after the change it needs has built and published.
+- **A change is ready only when every step its build workflow runs - not only Maven - has passed
+  locally.**
+- **Amend, squash or rebase only commits that are not pushed**, checked with
+  `git ls-remote origin refs/heads/main`, never with a cached `origin/main`. A pushed commit is
+  repaired by a new commit on the remote's tip, never by a force push.
+- **A commit message is one brief line saying in words what changed**, never by a requirement number;
+  the reasoning goes into an issue or a decision.
+- **A change to what ships or builds gets its changelog entry in the same commit**, under
+  `[Unreleased]` and the heading of its kind. A generated changelog is changed only through its
+  sources, never by hand.
+
+### Issues
+
+- **Every open task is an issue in `issues/`, named `<prefix><nn>-Short-Title.md`** with one of its
+  repository's prefixes; a repository may own several, for subgroups. An issue is one task, says
+  what must be true and how it is judged done, and names a dependency on another repository's issue
+  by repository and number.
+- **A new issue follows this skeleton**, and its index row is added in the same commit; *Why* and
+  *The shape* may follow *What must be true* in a larger issue:
+
+      # <PREFIX><nn> — <Short Title>
+
+      **Status:** now | soon | later; blocked by <repository> <number>, if so.
+
+      **What must be true.** One or two sentences, from the point of view of whoever uses it.
+
+      ## Acceptance
+
+      - How it is judged done: what is measured, and what must be seen to fail.
+
+      ## To be checked
+
+      - Open questions, if any; deleted once answered.
+- **`issues/README.md` is the index, grouped into Now, Soon and Later**, each a table of number,
+  status, blocked by, what it covers and open questions, ordered by what to do next; it changes in
+  the same commit as the issue. An open task is never a TODO in code or a note in a commit message.
+- **An issue's unanswered questions sit under *To be checked*, and the index counts them.** An
+  answered question is deleted once its answer is in the criteria, the design or a decision.
+- **A finished issue is deleted, with its row and every mention of its number.** What outlives it
+  moves first: to `doc/` if a user needs it, to `doc/decisions.md` if it is a decision, to
+  `AGENTS.md` if it is a rule, to `.AGENTS.md` if it is true only on one machine.
+- **`doc/decisions.md` opens with an index** - subject, one line of what holds, link - and a row is
+  written with its decision. An accepted risk states the exposure, why it stays, and what would
+  change the answer.
+- **A requirement not yet placed waits in `sokar-project`** until it is clear which repository builds
+  it, then moves there as an issue.
+- **Link to a requirement by its number and the index, never to its file**, which is deleted when the
+  requirement is finished. A repository that can test this, does.
+- **Code, comments, test names and anything that ships never cite an issue number**; they state the
+  constraint itself, since the issue is deleted once it is finished.
+
+### Testing and machines
+
+- **Work is tested on local VMs before it is handed over, on rented machines reachable from here only
+  when the operator says so, and in the GitHub build on every push.** Which machines a setup has is
+  defined in the optional `.AGENTS.md` or fed into every agent's context; machines are rented only
+  through the shared tooling, and nothing else names a provider.
+- **How agents exchange files for a test on a local VM is defined in `.AGENTS.md`.** Where it says
+  nothing, a test uses only the agent's own artifacts.
+- **A local VM is restarted only when agreed in the channel or asked of the operator.** A rented
+  machine reachable from here is restarted only by the operator.
+- **A rented machine's name says which agent and which run made it.** Every run deletes exactly what
+  it created, after a failure too, and never sweeps by age or touches a machine it cannot attribute.
+- **A script that changes a machine refuses to start over leftovers, removes only what it created -
+  on interrupt too - and exits non-zero naming anything it left.**
+- **Before a run on a shared machine, check what it does to that machine and say so.**
+- **Before a long run, say how long it will take**, from a measured time, or say that it is a guess.
+- **A test that waits on an agent, a model or any paid service fails fast on a loop**: it stops as
+  soon as the same failure repeats, instead of waiting out its time, and names what repeated. A run
+  seen looping is reported at once, so the operator can cancel it.
+- **A defect is fixed only after a unit or integration test reproduces it.** The test fails first,
+  then the fix makes it pass.
+- **A test is trusted only once it has been seen to fail**: break the code on purpose, watch the
+  test go red, and restore it. A break that does not compile proves nothing.
+- **A guard asserts what its reference set is, not only that it has entries**: an empty set, one
+  that cannot change, and one nobody reads all pass as green as one that works.
+- **A test asserts the observable effect, never what the system reports about itself or its
+  internals.** A fixture states what the real system produces, never what the code assumes, and is
+  never edited so that a feature has something to show.
+- **A test depends on nothing outside itself**: not on the machine's configuration (a suite calling
+  git runs with `GIT_CONFIG_GLOBAL=/dev/null`), not on wall-clock time, and not on a pinned version
+  written into it - it reads the version from the build.
+- **Before a commit, the full suite runs as its own step and its result is read.** A commit is gated
+  on the exit code, never on grepped output, and never chained onto the test run.
+- **A change handed over says which test levels actually ran** - unit tests, local VM, rented
+  machine - never which ought to have. A change to documents or issues only needs the unit tests.
+- **A test result names every skipped test**, never just a count.
+- **A failing check prints what it asked and what it got, never a guessed cause**, and its failure
+  path has been made to happen once and read.
+
+### Claims and writing
+
+- **Measure before you claim, and say what was measured and what inferred.** Agreement between agents
+  counts only where each measured, and "I could not get X" only once a second method failed too.
+- **A command that should have changed something is checked by observing the change** - connect,
+  read the file, ask the daemon - never by its exit code alone.
+- **Every date, time or age written is read from the system (`date -u`) first, never from memory.**
+  An age is computed from two timestamps that were both read.
+- **When a thing is right in two forms, keep one.** The second copy is the one that goes stale.
+- **Documentation and rules state what is true now**: no dates, no history, no stories, and nobody
+  named, only roles. The shared blocks' markers are the one exception.
+- **Everything written is US English** - documentation, issues, comments, commit messages, the
+  channel. Replies to the operator are in the language the operator writes in.
+- **A finding worth keeping is committed** - in an issue, the documentation or a decision - never
+  left only in a conversation or the channel.
+- **A finding taken from a third-party source is written as the finding, never naming the source**,
+  in anything committed.
+
+### Security and tools
+
+- **A secret never appears in a command line, a log line, a file name or an answer.** It reaches a
+  process through its environment or standard input, is stored only encrypted and readable by its
+  owner, never touches a filesystem in CI, and is never promised to be wiped from memory in Java or
+  Dart - only kept in fewer copies for less time.
+- **Every download follows redirects (`curl -L`), since any server may answer with one, and is
+  checked against the digest its source names before it is used.** Credentials are never passed on
+  to another host (`--location-trusted` is never used).
+- **Input from outside - upstream metadata, the environment, a file or an answer from another
+  program - is validated before it reaches a file, a command or a decision.**
+- **A binary run with more rights than its caller is taken by path and refused when it or its
+  directory could have been placed or changed by anybody else.**
+- **`pkill -f` and `pgrep -f` match their own command line**, and can kill the shell running them;
+  use a bracket pattern like `[p]odman`.
+- **A long build or suite is watched through `tee` into a file**, never through a pipe into `grep`,
+  which holds everything back until the end and looks like a hang.
+- **`ssh -n host 'bash -s' <<EOF` runs nothing and exits 0**; a script sent on standard input goes
+  without `-n`.
+
+### Skills
+
+- **Skills come from `https://fuinorg.jfrog.io/artifactory/agent-skills/`**, one reviewed package
+  per skill, readable without credentials; each repository's own part names only which skills it
+  uses, by slug.
+- **Fetch, check and unpack them like this**, with the skills directory of your own harness (Claude
+  Code reads `~/.claude/skills/<slug>/`):
+
+      BASE=https://fuinorg.jfrog.io/artifactory/agent-skills
+      curl -fsSL $BASE/.skills/skills.json                         # every slug, latest version
+      curl -fsSL -o s.zip $BASE/<slug>/<version>/<slug>-<version>.zip
+      curl -fsSL $BASE/../api/storage/agent-skills/<slug>/<version>/<slug>-<version>.zip  # its sha256
+      unzip -q -d <skills directory>/<slug> s.zip
+
+- **A harness that cannot install a skill reads its `SKILL.md`** from a directory outside the
+  repository.
+- **A skill is knowledge, not authority**: where it and a measurement disagree, the measurement
+  wins, and a finding from reading code against a skill is a guess until a failing test reproduces
+  it. Whether a skill is loaded is asked of the harness, not read from a directory.
+
+### Code and builds
+
+- **Fail closed and loud**: when a dependency is unreachable, a key is unknown or a check cannot run,
+  stop with a non-zero exit code and say why; inside a program, an exception that says why does the
+  same. Never silently do less.
+- **A comment says why, never what, in one line where it can.** Reasoning that does not fit goes into
+  documentation or a decision, and a small named method is preferred over a comment explaining a
+  block.
+- **Dot files are not committed.** `.gitignore` ignores `.*` and excepts only what a build needs - in
+  a Java repository `.github`, `.mvn`, `.gitignore` and `.gitkeep` - and what is true of one machine
+  goes into `.AGENTS.md`.
+- **A Java repository builds, checks and tests with Java and Maven only.** A file that cannot be
+  Java - `mvnw`, or a script that runs where there is no Java yet - is named in its repository's own
+  part with the reason, and no repository keeps a copy of a helper another one has.
+- **Every Java package with main code is `@NullMarked` and checked by NullAway as an error when it
+  compiles**, with a test that fails on an unmarked package.
+- **`Files.move` with `ATOMIC_MOVE` replaces a file that already has the target name**; where the
+  first of two writers must win, publish with `Files.createLink` (`link(2)`), which fails on an
+  existing name.
+- **Java code carries brief Javadoc on every public type and method; a test method's name reads as a
+  sentence (never `testXxx`) and an assertion states its reason (`.as(...)`).** Every Maven call in
+  CI passes `-s settings.xml`.
+- **Everything a build runs is pinned and moved only by review**: actions by commit with the version
+  beside it, the JDK (from `sokar-machines jdk --github`), Maven and images by version and digest,
+  updated by Dependabot weekly, in one group, after three days. `sokar-release check-actions`
+  enforces it.
+- **Packages are built online**: offline, the CycloneDX bill of materials skips itself with only a
+  warning, and the package ships without it.
+- **A publish is believed only once the published index shows the exact version**, probed with
+  retries; a snapshot version sorts above the one before it. Retiring a package removes it from the
+  index too.
+- **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
+  build checks each executable for exactly that instruction set.
+
+> **END Shared Area** · sha256 `6f50f80a2fb6ec54`

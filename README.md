@@ -47,3 +47,6 @@ It reads the other repositories and writes this repository's Pages; nothing else
   that name it.
 - **An hourly run builds only when something moved:** the last build's manifest is kept in the Actions cache, and
   a run that finds the same one has nothing to do.
+
+## Licence
+GNU General Public License v3.0 or later — see [LICENSE](LICENSE).

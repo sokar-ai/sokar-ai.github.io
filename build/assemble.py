@@ -2,9 +2,9 @@
 """Assembles one documentation site from the doc/ of every Sokar repository.
 
 The list of repositories, and their order, is sokar-project's project.yml: its `repositories`, each with the
-`upstream` it is reached at. For each, the documentation of its newest release (a tag `v<version>`) is taken, or
-of its default branch while it has none - and the page says which. A repository with no doc/ is left out and
-named in the log.
+`upstream` it is reached at. For each, the documentation on its default branch is taken, so a page appears within
+the hour of a push, and the start page says at which commit. A repository with no doc/ is left out and named in the
+log.
 
 A section's order is the `nav` of that repository's own mkdocs.yml, when it has one; otherwise its index.md, then
 its other pages by name. A relative link that leaves doc/ (to the README, to issues/) would be dead on the site,
@@ -15,7 +15,7 @@ used, given to git through the environment, never on a command line; once they a
 repository that cannot be read fails the build, naming it: a site that silently left a part out was published once,
 and it was every part.
 
-    assemble.py --out WORK [--project-yml FILE] [--local NAME=PATH ...] [--branch-only]
+    assemble.py --out WORK [--project-yml FILE] [--local NAME=PATH ...]
 """
 
 import argparse
@@ -100,28 +100,13 @@ def parts(project):
     return [part for part in found if not part[1].endswith(f"/{SELF}.git")]
 
 
-def version(tag):
-    return tuple(int(n) for n in re.findall(r"\d+", tag))
-
-
-def newest_release(url):
-    """The newest tag v<version>, as (tag, commit), or None."""
-    lines = git("ls-remote", "--tags", "--refs", url, "v*").splitlines()
-    tags = [(line.split("\t")[1].removeprefix("refs/tags/"), line.split("\t")[0]) for line in lines if "\t" in line]
-    tags = [tag for tag in tags if re.fullmatch(r"v\d+(\.\d+)*", tag[0])]
-    return max(tags, key=lambda tag: version(tag[0])) if tags else None
-
-
-def fetch(name, url, where, branch_only):
-    """Checks a repository out into `where`, at its newest release or its default branch; returns what was taken."""
-    release = None if branch_only else newest_release(url)
-    ref = release[0] if release else "HEAD"
+def fetch(name, url, where):
+    """Checks a repository out into `where`, at its default branch; returns what was taken."""
     git("init", "-q", where)
-    git("fetch", "-q", "--depth=1", url, ref, cwd=where)
+    git("fetch", "-q", "--depth=1", url, "HEAD", cwd=where)
     git("checkout", "-q", "FETCH_HEAD", cwd=where)
     commit = git("rev-parse", "HEAD", cwd=where).strip()
-    return {"name": name, "ref": release[0] if release else "main", "release": release is not None,
-            "commit": commit}
+    return {"name": name, "ref": "main", "commit": commit}
 
 
 # Material for MkDocs, by configuration alone: a tab per repository, search, light or dark as the reader's system
@@ -195,7 +180,7 @@ def prefixed(nav, name):
     return {title: prefixed(entry, name) for title, entry in nav.items()}
 
 
-def assemble(out, project, local, branch_only):
+def assemble(out, project, local):
     docs = os.path.join(out, "docs")
     shutil.rmtree(out, ignore_errors=True)
     os.makedirs(docs)
@@ -211,10 +196,10 @@ def assemble(out, project, local, branch_only):
                 shutil.copytree(os.path.join(local[name], "doc"), os.path.join(checkout, "doc"))
             if os.path.isfile(os.path.join(local[name], "mkdocs.yml")):
                 shutil.copyfile(os.path.join(local[name], "mkdocs.yml"), os.path.join(checkout, "mkdocs.yml"))
-            taken = {"name": name, "ref": "local", "release": False, "commit": "local"}
+            taken = {"name": name, "ref": "local", "commit": "local"}
         else:
             try:
-                taken = fetch(name, url, checkout, branch_only)
+                taken = fetch(name, url, checkout)
             except subprocess.CalledProcessError as failed:
                 log(f"cannot read {name}: {failed.stderr.strip() or failed}")
                 unread.append(name)
@@ -262,8 +247,7 @@ def landing(built):
              "every part of it, each taken from its own repository.", "",
              "| Part | What it is | Taken from |", "|---|---|---|"]
     for part in built:
-        source = (f"release {part['ref']}" if part["release"]
-                  else f"`{part['ref']}` at `{part['commit'][:12]}`, not released yet")
+        source = f"`{part['ref']}` at `{part['commit'][:12]}`"
         lines.append(f"| [{part['name']}]({part['first']}) | {part['description']} | {source} |")
     return "\n".join(lines) + "\n"
 
@@ -274,7 +258,6 @@ def main():
     parser.add_argument("--project-yml", help="read this file instead of sokar-project's on GitHub")
     parser.add_argument("--local", action="append", default=[], metavar="NAME=PATH",
                         help="take a repository from a checkout here instead of GitHub")
-    parser.add_argument("--branch-only", action="store_true", help="take default branches, not releases")
     parser.add_argument("--manifest", action="store_true",
                         help="print only what would be taken, as parts.json says it, and build nothing")
     args = parser.parse_args()
@@ -283,10 +266,8 @@ def main():
         taken, unread = [], []
         for name, url, _ in parts(project):
             try:
-                release = None if args.branch_only else newest_release(url)
-                ref = release[0] if release else "main"
-                commit = release[1] if release else git("ls-remote", url, "HEAD").split("\t")[0]
-                taken.append({"name": name, "ref": ref, "commit": commit})
+                commit = git("ls-remote", url, "HEAD").split("\t")[0]
+                taken.append({"name": name, "ref": "main", "commit": commit})
             except subprocess.CalledProcessError as failed:
                 log(f"cannot read {name}: {failed.stderr.strip() or failed}")
                 unread.append(name)
@@ -294,7 +275,7 @@ def main():
         print(json.dumps(taken, indent=1))
         return
     local = dict(entry.split("=", 1) for entry in args.local)
-    for part in assemble(args.out, project, local, args.branch_only):
+    for part in assemble(args.out, project, local):
         log(f"took {part['name']} at {part['ref']} ({part['commit'][:12]})")
 
 

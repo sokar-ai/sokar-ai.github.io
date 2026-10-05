@@ -32,6 +32,27 @@ class GitTest(unittest.TestCase):
         self.assertNotIn("theirs", sent[0])
 
 
+class FetchTest(unittest.TestCase):
+
+    def test_takes_the_default_branch_even_when_a_release_is_tagged(self):
+        # The operator's word: the site shows what is on main, so new pages appear within the hour of a push.
+        with tempfile.TemporaryDirectory() as tmp:
+            repository = os.path.join(tmp, "repository")
+            subprocess.run(["git", "init", "-q", "-b", "main", repository], check=True)
+            for message in ("released", "after the release"):
+                subprocess.run(["git", "-C", repository, "-c", "user.name=t", "-c", "user.email=t@t", "-c",
+                                "commit.gpgSign=false", "commit", "-q", "--allow-empty", "-m", message], check=True)
+                if message == "released":
+                    subprocess.run(["git", "-C", repository, "-c", "tag.gpgSign=false", "tag", "v0.4.0"], check=True)
+            head = subprocess.run(["git", "-C", repository, "rev-parse", "HEAD"], check=True, capture_output=True,
+                                  text=True).stdout.strip()
+
+            taken = assemble.fetch("repository", repository, os.path.join(tmp, "checkout"))
+
+        self.assertEqual(taken["commit"], head)
+        self.assertEqual(taken["ref"], "main")
+
+
 class AssembleTest(unittest.TestCase):
 
     def run_with(self, fetched):
@@ -41,10 +62,10 @@ class AssembleTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as out, \
                 mock.patch.object(assemble, "parts", return_value=parts), \
                 mock.patch.object(assemble, "fetch", side_effect=fetched):
-            return assemble.assemble(os.path.join(out, "site"), project, {}, False)
+            return assemble.assemble(os.path.join(out, "site"), project, {})
 
     def test_a_repository_that_cannot_be_read_fails_the_build(self):
-        def unreadable(name, url, where, branch_only):
+        def unreadable(name, url, where):
             raise subprocess.CalledProcessError(128, ["git", "fetch"], stderr="remote: Duplicate header")
 
         with self.assertRaises(SystemExit) as stopped:
@@ -53,13 +74,13 @@ class AssembleTest(unittest.TestCase):
         self.assertIn("core", str(stopped.exception.code))
 
     def test_one_repository_that_cannot_be_read_fails_it_too(self):
-        def one_unreadable(name, url, where, branch_only):
+        def one_unreadable(name, url, where):
             if name == "core":
                 raise subprocess.CalledProcessError(128, ["git", "fetch"], stderr="not found")
             os.makedirs(os.path.join(where, "doc"))
             with open(os.path.join(where, "doc", "index.md"), "w", encoding="utf-8") as page:
                 page.write("# The project\n")
-            return {"name": name, "ref": "main", "release": False, "commit": "0" * 40}
+            return {"name": name, "ref": "main", "commit": "0" * 40}
 
         with self.assertRaises(SystemExit) as stopped:
             self.run_with(one_unreadable)
@@ -67,18 +88,18 @@ class AssembleTest(unittest.TestCase):
         self.assertNotIn("sokar-project", str(stopped.exception.code))
 
     def test_the_site_is_built_with_material_tabs_search_and_both_schemes(self):
-        def readable(name, url, where, branch_only):
+        def readable(name, url, where):
             os.makedirs(os.path.join(where, "doc"))
             with open(os.path.join(where, "doc", "index.md"), "w", encoding="utf-8") as page:
                 page.write(f"# {name}\n")
-            return {"name": name, "ref": "main", "release": False, "commit": "0" * 40}
+            return {"name": name, "ref": "main", "commit": "0" * 40}
 
         project = {"repositories": {}}
         parts = [("sokar-project", "https://github.com/sokar-ai/sokar-project.git", "")]
         with tempfile.TemporaryDirectory() as out, \
                 mock.patch.object(assemble, "parts", return_value=parts), \
                 mock.patch.object(assemble, "fetch", side_effect=readable):
-            assemble.assemble(os.path.join(out, "site"), project, {}, False)
+            assemble.assemble(os.path.join(out, "site"), project, {})
             with open(os.path.join(out, "site", "mkdocs.yml"), encoding="utf-8") as file:
                 config = assemble.yaml.safe_load(file)
 
@@ -90,11 +111,11 @@ class AssembleTest(unittest.TestCase):
         self.assertIn("search", config["plugins"])
 
     def test_every_repository_read_builds(self):
-        def readable(name, url, where, branch_only):
+        def readable(name, url, where):
             os.makedirs(os.path.join(where, "doc"))
             with open(os.path.join(where, "doc", "index.md"), "w", encoding="utf-8") as page:
                 page.write(f"# {name}\n")
-            return {"name": name, "ref": "main", "release": False, "commit": "0" * 40}
+            return {"name": name, "ref": "main", "commit": "0" * 40}
 
         self.assertEqual([part["name"] for part in self.run_with(readable)], ["sokar-project", "core"])
 

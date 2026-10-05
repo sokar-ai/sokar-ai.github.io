@@ -10,14 +10,14 @@ its own `doc/`, where its code is, and checks it there; this repository only col
 - **Which repositories, in which order:** those `sokar-ai/sokar-project`'s `project.yml` names under
   `repositories`, after the project's own. A repository without `doc/` is left out, and the run's log says so;
   one that cannot be read fails the build, so a site with a part missing is never published.
-- **Which state of each:** its newest release, a tag `v<version>`. While a repository has none, its default
-  branch, and the start page says "not released yet" beside it.
+- **Which state of each:** its default branch, so a page appears within the hour of a push; the start page says
+  at which commit.
 - **A section's order** is the `nav` of the repository's own `mkdocs.yml`; without one, its `index.md` and then
   its other pages by name. Only pages and images are taken from `doc/`.
 - **A link that leaves `doc/`** (to the README, to `issues/`) points at that file in its repository, at the
   commit the section was built from.
-- **When:** every night and by hand, always; every hour, only when a release or a default branch moved since
-  what the site shows (`parts.json` on the site says what that is).
+- **When:** every night and by hand, always; every hour, only when a default branch moved since what the site
+  shows (`parts.json` on the site says what that is).
 
 `build/assemble.py` does the collecting; `.github/workflows/site.yml` runs it, builds with `mkdocs --strict` and
 publishes with GitHub Pages. The theme is Material for MkDocs, by configuration alone: a tab per repository,

@@ -66,6 +66,29 @@ class AssembleTest(unittest.TestCase):
         self.assertIn("core", str(stopped.exception.code))
         self.assertNotIn("sokar-project", str(stopped.exception.code))
 
+    def test_the_site_is_built_with_material_tabs_search_and_both_schemes(self):
+        def readable(name, url, where, branch_only):
+            os.makedirs(os.path.join(where, "doc"))
+            with open(os.path.join(where, "doc", "index.md"), "w", encoding="utf-8") as page:
+                page.write(f"# {name}\n")
+            return {"name": name, "ref": "main", "release": False, "commit": "0" * 40}
+
+        project = {"repositories": {}}
+        parts = [("sokar-project", "https://github.com/sokar-ai/sokar-project.git", "")]
+        with tempfile.TemporaryDirectory() as out, \
+                mock.patch.object(assemble, "parts", return_value=parts), \
+                mock.patch.object(assemble, "fetch", side_effect=readable):
+            assemble.assemble(os.path.join(out, "site"), project, {}, False)
+            with open(os.path.join(out, "site", "mkdocs.yml"), encoding="utf-8") as file:
+                config = assemble.yaml.safe_load(file)
+
+        theme = config["theme"]
+        self.assertEqual(theme["name"], "material")
+        self.assertIn("navigation.tabs", theme["features"])
+        self.assertEqual([scheme["scheme"] for scheme in theme["palette"]], ["default", "slate"])
+        self.assertTrue(all("prefers-color-scheme" in scheme["media"] for scheme in theme["palette"]))
+        self.assertIn("search", config["plugins"])
+
     def test_every_repository_read_builds(self):
         def readable(name, url, where, branch_only):
             os.makedirs(os.path.join(where, "doc"))

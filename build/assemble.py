@@ -124,6 +124,20 @@ def fetch(name, url, where, branch_only):
             "commit": commit}
 
 
+# Material for MkDocs, by configuration alone: a tab per repository, search, light or dark as the reader's system
+# says, and tables that wrap their cells instead of cutting them off, which the theme before it could not.
+THEME = {
+    "name": "material",
+    "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.indexes",
+                 "search.suggest", "search.highlight", "content.code.copy"],
+    "palette": [
+        {"media": "(prefers-color-scheme: light)", "scheme": "default",
+         "toggle": {"icon": "material/weather-night", "name": "Dark"}},
+        {"media": "(prefers-color-scheme: dark)", "scheme": "slate",
+         "toggle": {"icon": "material/weather-sunny", "name": "Light"}},
+    ],
+}
+
 # What a page shows besides its text. Anything else in doc/ - a walk's JSON, a fixture - is not for the site.
 ASSETS = (".png", ".svg", ".jpg", ".jpeg", ".gif", ".webp")
 
@@ -191,7 +205,12 @@ def assemble(out, project, local, branch_only):
     for name, url, description in parts(project):
         checkout = os.path.join(out, "repositories", name)
         if name in local:
-            shutil.copytree(local[name], checkout, ignore=shutil.ignore_patterns(".git", "target", ".worktrees"))
+            # Only what the site reads: a whole checkout holds build output, and links into it that lead nowhere.
+            os.makedirs(checkout)
+            if os.path.isdir(os.path.join(local[name], "doc")):
+                shutil.copytree(os.path.join(local[name], "doc"), os.path.join(checkout, "doc"))
+            if os.path.isfile(os.path.join(local[name], "mkdocs.yml")):
+                shutil.copyfile(os.path.join(local[name], "mkdocs.yml"), os.path.join(checkout, "mkdocs.yml"))
             taken = {"name": name, "ref": "local", "release": False, "commit": "local"}
         else:
             try:
@@ -229,8 +248,9 @@ def assemble(out, project, local, branch_only):
     with open(os.path.join(docs, "parts.json"), "w", encoding="utf-8") as manifest:
         json.dump(considered, manifest, indent=1)
     config = {"site_name": "Sokar", "site_url": SITE_URL, "repo_url": f"https://github.com/{ORG}",
-              "docs_dir": "docs", "site_dir": "site", "theme": "readthedocs", "strict": True,
-              "nav": nav}
+              "docs_dir": "docs", "site_dir": "site", "theme": THEME, "plugins": ["search"],
+              "markdown_extensions": ["tables", "admonition", "attr_list", {"toc": {"permalink": True}}],
+              "strict": True, "nav": nav}
     with open(os.path.join(out, "mkdocs.yml"), "w", encoding="utf-8") as file:
         yaml.safe_dump(config, file, sort_keys=False, allow_unicode=True)
     return built

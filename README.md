@@ -20,7 +20,8 @@ its own `doc/`, where its code is, and checks it there; this repository only col
   what the site shows (`parts.json` on the site says what that is).
 
 `build/assemble.py` does the collecting; `.github/workflows/site.yml` runs it, builds with `mkdocs --strict` and
-publishes with GitHub Pages.
+publishes with GitHub Pages. The theme is Material for MkDocs, by configuration alone: a tab per repository,
+search, light or dark as the reader's system says, and tables that wrap.
 
 ## Building it on your own computer
 

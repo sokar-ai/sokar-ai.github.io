@@ -89,14 +89,20 @@ def https(upstream):
 
 
 def parts(project):
-    """Every repository the project names, in its order: the project's own repository first."""
-    found = [(PROJECT, f"https://github.com/{ORG}/{PROJECT}.git", (project.get("project") or {}).get("description", ""))]
+    """Every repository the project names, in its order, and the project's own repository last.
+
+    Last because it is organizational, of little interest to someone who uses Sokar (the operator, 2026-10-05); the
+    menu and the start page follow this order.
+    """
+    found = []
     for name, repository in (project.get("repositories") or {}).items():
         url = https((repository or {}).get("upstream"))
         if url is None:
             log(f"skipped {name}: no GitHub upstream in project.yml")
             continue
         found.append((name, url, (repository or {}).get("description", "")))
+    found.append((PROJECT, f"https://github.com/{ORG}/{PROJECT}.git",
+                  (project.get("project") or {}).get("description", "")))
     return [part for part in found if not part[1].endswith(f"/{SELF}.git")]
 
 

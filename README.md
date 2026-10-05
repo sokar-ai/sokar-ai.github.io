@@ -8,8 +8,9 @@ its own `doc/`, where its code is, and checks it there; this repository only col
 ## How the site is built
 
 - **Which repositories, in which order:** those `sokar-ai/sokar-project`'s `project.yml` names under
-  `repositories`, after the project's own. A repository without `doc/` is left out, and the run's log says so;
-  one that cannot be read fails the build, so a site with a part missing is never published.
+  `repositories`, in that order, and the project's own last, as the one of least interest to a user. A
+  repository without `doc/` is left out, and the run's log says so; one that cannot be read fails the build, so a
+  site with a part missing is never published.
 - **Which state of each:** its default branch, so a page appears within the hour of a push; the start page says
   at which commit.
 - **A section's order** is the `nav` of the repository's own `mkdocs.yml`; without one, its `index.md` and then

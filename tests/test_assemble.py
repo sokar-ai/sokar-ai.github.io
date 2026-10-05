@@ -32,6 +32,21 @@ class GitTest(unittest.TestCase):
         self.assertNotIn("theirs", sent[0])
 
 
+class PartsTest(unittest.TestCase):
+
+    def test_the_project_comes_last_and_its_repositories_in_their_order(self):
+        # The operator's word: the project's own repository is organizational, of little interest to a user.
+        project = {"project": {"description": "the project"},
+                   "repositories": {
+                       "core": {"upstream": "git@github.com:sokar-ai/sokar.git"},
+                       "frontend": {"upstream": "git@github.com:sokar-ai/sokar-frontend.git"},
+                       "site": {"upstream": "git@github.com:sokar-ai/sokar-ai.github.io.git"},
+                       "buildtools": {"upstream": "git@github.com:sokar-ai/sokar-buildtools.git"}}}
+
+        self.assertEqual([name for name, _, _ in assemble.parts(project)],
+                         ["core", "frontend", "buildtools", "sokar-project"])
+
+
 class FetchTest(unittest.TestCase):
 
     def test_takes_the_default_branch_even_when_a_release_is_tagged(self):

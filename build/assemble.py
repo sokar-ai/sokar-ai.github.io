@@ -11,8 +11,9 @@ its other pages by name. A relative link that leaves doc/ (to the README, to iss
 so it is turned into a link to that file in the repository, at the commit the section was built from.
 
 Reads only. While the repositories are private, SOKAR_DOCS_READ (a token that can read them and nothing else) is
-used, given to git through the environment, never on a command line; once they are public it is not needed, and a
-repository that cannot be read is left out and named in the log.
+used, given to git through the environment, never on a command line; once they are public it is not needed. A
+repository that cannot be read fails the build, naming it: a site that silently left a part out was published once,
+and it was every part.
 
     assemble.py --out WORK [--project-yml FILE] [--local NAME=PATH ...] [--branch-only]
 """
@@ -25,6 +26,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.request
 
 import yaml
@@ -40,8 +42,13 @@ def log(message):
 
 
 def git_env():
-    """git's environment: the read token as a header when there is one, and never a prompt for a password."""
-    env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+    """git's environment: the read token as a header when there is one, and never a prompt for a password.
+
+    No configuration but this: not the user's, not the system's, and - as git() runs nowhere else - not that of the
+    repository it was started in. A workflow's checkout keeps its own credential as the same header, git sent both,
+    and GitHub refused every repository with "Duplicate header".
+    """
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
     token = os.environ.get("SOKAR_DOCS_READ", "")
     if token:
         basic = base64.b64encode(f"x-access-token:{token}".encode()).decode()
@@ -51,8 +58,15 @@ def git_env():
 
 
 def git(*args, cwd=None):
-    return subprocess.run(["git", *args], cwd=cwd, env=git_env(), check=True, capture_output=True,
-                          text=True).stdout
+    """Runs git, in `cwd` or else in a directory outside every repository, so no repository's config applies."""
+    return subprocess.run(["git", *args], cwd=cwd or tempfile.gettempdir(), env=git_env(), check=True,
+                          capture_output=True, text=True).stdout
+
+
+def unread_stops(unread):
+    """Stops the build, naming every repository that could not be read; nothing is published without them."""
+    if unread:
+        raise SystemExit("cannot build the site, these repositories could not be read: " + ", ".join(unread))
 
 
 def project_yml(path):
@@ -173,7 +187,7 @@ def assemble(out, project, local, branch_only):
     os.makedirs(docs)
     # Every repository read, with or without doc/: what an hourly run compares, so one with nothing to show does not
     # look changed at every hour.
-    built, considered, nav = [], [], [{"Sokar": "index.md"}]
+    built, considered, unread, nav = [], [], [], [{"Sokar": "index.md"}]
     for name, url, description in parts(project):
         checkout = os.path.join(out, "repositories", name)
         if name in local:
@@ -183,8 +197,8 @@ def assemble(out, project, local, branch_only):
             try:
                 taken = fetch(name, url, checkout, branch_only)
             except subprocess.CalledProcessError as failed:
-                # One repository that cannot be read must not leave the site unbuilt, nor hide that it is missing.
-                log(f"skipped {name}: {failed.stderr.strip() or failed}")
+                log(f"cannot read {name}: {failed.stderr.strip() or failed}")
+                unread.append(name)
                 continue
         considered.append({k: taken[k] for k in ("name", "ref", "commit")})
         doc = os.path.join(checkout, "doc")
@@ -209,6 +223,7 @@ def assemble(out, project, local, branch_only):
         section = nav_of(checkout, name)
         taken["first"] = first_page(section)
         nav.append({name: section})
+    unread_stops(unread)
     with open(os.path.join(docs, "index.md"), "w", encoding="utf-8") as index:
         index.write(landing(built))
     with open(os.path.join(docs, "parts.json"), "w", encoding="utf-8") as manifest:
@@ -245,7 +260,7 @@ def main():
     args = parser.parse_args()
     project = project_yml(args.project_yml)
     if args.manifest:
-        taken = []
+        taken, unread = [], []
         for name, url, _ in parts(project):
             try:
                 release = None if args.branch_only else newest_release(url)
@@ -253,7 +268,9 @@ def main():
                 commit = release[1] if release else git("ls-remote", url, "HEAD").split("\t")[0]
                 taken.append({"name": name, "ref": ref, "commit": commit})
             except subprocess.CalledProcessError as failed:
-                log(f"skipped {name}: {failed.stderr.strip() or failed}")
+                log(f"cannot read {name}: {failed.stderr.strip() or failed}")
+                unread.append(name)
+        unread_stops(unread)
         print(json.dumps(taken, indent=1))
         return
     local = dict(entry.split("=", 1) for entry in args.local)

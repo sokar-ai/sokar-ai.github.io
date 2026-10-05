@@ -56,6 +56,26 @@ class PartsTest(unittest.TestCase):
         self.assertIn("repositories", description)
 
 
+class RelinkedTest(unittest.TestCase):
+
+    def test_a_relative_source_in_raw_html_reaches_its_file_from_the_pages_own_directory(self):
+        # Measured on the site: core/how-it-works/ showed no picture, as its <img src="images/dummy.svg"> was read
+        # from core/how-it-works/images/. MkDocs moves Markdown's links for a page that becomes a directory, not HTML.
+        text = '<img align="left" src="images/dummy.svg" alt="a dummy">\n![shown](images/b.svg)\n'
+
+        page = assemble.relinked(text, "/r/doc/how-it-works.md", "/r/doc", "sokar", "0" * 40)
+        index = assemble.relinked(text, "/r/doc/index.md", "/r/doc", "sokar", "0" * 40)
+
+        self.assertIn('src="../images/dummy.svg"', page)
+        self.assertIn("](images/b.svg)", page)
+        self.assertIn('src="images/dummy.svg"', index)
+
+    def test_an_absolute_or_external_source_stays(self):
+        text = '<img src="https://example.org/a.svg"> <img src="/a.svg"> <a href="#top">top</a>'
+
+        self.assertEqual(assemble.relinked(text, "/r/doc/page.md", "/r/doc", "sokar", "0" * 40), text)
+
+
 class FetchTest(unittest.TestCase):
 
     def test_takes_the_default_branch_even_when_a_release_is_tagged(self):

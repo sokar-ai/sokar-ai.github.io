@@ -135,6 +135,9 @@ ASSETS = (".png", ".svg", ".jpg", ".jpeg", ".gif", ".webp")
 
 LINK = re.compile(r"(\]\()([^)\s]+)(\))")
 
+# A link inside raw HTML: MkDocs moves a Markdown link for a page that becomes a directory, but not one of these.
+HTML_LINK = re.compile(r"""(<[a-zA-Z][^>]*?\s(?:src|href)=")([^"]+)(")""")
+
 
 def relinked(text, page, doc, repository, commit):
     """Links that leave doc/ point at the file in the repository, at the commit the section was built from."""
@@ -151,7 +154,19 @@ def relinked(text, page, doc, repository, commit):
         return (f"{match.group(1)}https://github.com/{ORG}/{repository}/blob/{commit}/{relative}"
                 f"{'#' + anchor if anchor else ''}{match.group(3)}")
 
-    return LINK.sub(one, text)
+    def html(match):
+        target = match.group(2)
+        if re.match(r"^[a-z][a-z0-9+.-]*:|^#|^/", target):
+            return match.group(0)
+        moved = one(re.match(r"(\]\()(.*)(\))", f"]({target})"))
+        if moved != f"]({target})":
+            return f"{match.group(1)}{moved[2:-1]}{match.group(3)}"
+        # A page other than index.md is served from a directory of its own name, one level below its file.
+        if os.path.basename(page) != "index.md":
+            target = "../" + target
+        return f"{match.group(1)}{target}{match.group(3)}"
+
+    return HTML_LINK.sub(html, LINK.sub(one, text))
 
 
 def nav_of(checkout, name):

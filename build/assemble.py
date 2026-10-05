@@ -35,6 +35,7 @@ ORG = "sokar-ai"
 SELF = "sokar-ai.github.io"
 PROJECT = "sokar-project"
 SITE_URL = "https://sokar-ai.github.io/"
+PROJECT_DESCRIPTION = "How Sokar is developed as one project over these repositories, and what belongs to all of them"
 
 
 def log(message):
@@ -101,8 +102,8 @@ def parts(project):
             log(f"skipped {name}: no GitHub upstream in project.yml")
             continue
         found.append((name, url, (repository or {}).get("description", "")))
-    found.append((PROJECT, f"https://github.com/{ORG}/{PROJECT}.git",
-                  (project.get("project") or {}).get("description", "")))
+    # Not project.description: that says what Sokar is, and beside this repository it read as if it were the box.
+    found.append((PROJECT, f"https://github.com/{ORG}/{PROJECT}.git", PROJECT_DESCRIPTION))
     return [part for part in found if not part[1].endswith(f"/{SELF}.git")]
 
 

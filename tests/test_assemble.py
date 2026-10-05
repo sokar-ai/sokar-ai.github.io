@@ -46,6 +46,15 @@ class PartsTest(unittest.TestCase):
         self.assertEqual([name for name, _, _ in assemble.parts(project)],
                          ["core", "frontend", "buildtools", "sokar-project"])
 
+    def test_the_project_row_says_what_the_repository_holds_not_what_sokar_is(self):
+        # project.description describes Sokar itself; beside the project's repository it read as nonsense.
+        project = {"project": {"description": "A hardened box an agent works in"}, "repositories": {}}
+
+        description = dict((name, text) for name, _, text in assemble.parts(project))["sokar-project"]
+
+        self.assertNotIn("hardened box", description)
+        self.assertIn("repositories", description)
+
 
 class FetchTest(unittest.TestCase):
 

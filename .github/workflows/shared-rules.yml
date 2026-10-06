@@ -1,0 +1,39 @@
+# Checks the documents: AGENTS.md's shared block against its hash, and no citation of an issue that goes stale, with
+# the shared build tools from Central. Of its own because the site's build is about other repositories' pages, and it
+# leases no machine.
+name: Shared rules
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Maven by the wrapper's pinned distribution and digest; the runner's own Java 25 only runs sokar-machines once,
+      # which installs the pinned GraalVM, checked against its digest, as JAVA_HOME for the steps after it.
+      - name: The shared build tools and the pinned GraalVM
+        run: |
+          set -eu
+          [ -n "${JAVA_HOME_25_X64:-}" ] || { echo "::error::this runner has no Java 25 (JAVA_HOME_25_X64)"; exit 1; }
+          export JAVA_HOME="$JAVA_HOME_25_X64"
+          ./mvnw -B -q -f build/pom.xml dependency:build-classpath -Dmdep.outputFile="$RUNNER_TEMP/tools-cp.txt"
+          "$JAVA_HOME/bin/java" -cp "$(cat "$RUNNER_TEMP/tools-cp.txt")" org.fuin.sokar.machines.Main jdk --github
+
+      - name: The shared block against its hash
+        run: '"$JAVA_HOME/bin/java" -cp "$(cat "$RUNNER_TEMP/tools-cp.txt")" org.fuin.sokar.release.Main check-shared AGENTS.md'
+
+      - name: No citation of an issue that goes stale
+        run: '"$JAVA_HOME/bin/java" -cp "$(cat "$RUNNER_TEMP/tools-cp.txt")" org.fuin.sokar.release.Main check-citations .'
+
+      - name: The tests that read documents
+        run: python3 -m unittest discover -s tests -p 'test_documents_*.py'

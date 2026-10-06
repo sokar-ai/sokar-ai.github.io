@@ -5,8 +5,13 @@ How the site of all Sokar documentation is put together.
 - **No page is written here**: documentation lives in the `doc/` of the repository whose code it describes, and
   this repository only collects, orders and publishes it.
 - **Before a commit, build the site** with `build/assemble.py` and `mkdocs build --strict`, as the README shows.
-- **No test here reads a document of this repository**: `tests/` writes the pages it checks into temporary
-  directories, so there is nothing to tag `documents` until a test reads one.
+- **A test that reads a document of this repository is named `test_documents_*.py`**, and those run alone with
+  `python3 -m unittest discover -s tests -p 'test_documents_*.py'`; `test_documents_tagged.py` fails when one is
+  named otherwise. Only that guard reads documents today: `tests/` writes the pages it checks into temporary
+  directories.
+- **The shared build tools' version is in `build/pom.xml`**, which builds nothing; the Shared rules workflow takes
+  them from Central by it with `./mvnw`, installs the pinned GraalVM with `sokar-machines jdk --github`, and runs
+  `check-shared` and `check-citations` with it.
 
 ## Shared across the Sokar repositories
 

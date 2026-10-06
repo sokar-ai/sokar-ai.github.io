@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Nothing is built from this: it names the shared build tools, so the Shared rules workflow can take them from
+     Central by version and run their checks on this repository. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.fuin.sokar</groupId>
+    <artifactId>sokar-ai-github-io-tools</artifactId>
+    <version>0</version>
+    <packaging>pom</packaging>
+
+    <properties>
+        <!-- The shared build tools, from sokar-ai/sokar-buildtools on Central. -->
+        <sokar.buildtools.version>0.4.1</sokar.buildtools.version>
+    </properties>
+
+    <dependencies>
+        <!-- Installs the GraalVM the CI snapshots pin, checked against its digest. -->
+        <dependency>
+            <groupId>org.fuin.sokar</groupId>
+            <artifactId>sokar-machines</artifactId>
+            <version>${sokar.buildtools.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.fuin.sokar</groupId>
+            <artifactId>sokar-release</artifactId>
+            <version>${sokar.buildtools.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.8.1</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>

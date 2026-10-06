@@ -5,10 +5,12 @@ How the site of all Sokar documentation is put together.
 - **No page is written here**: documentation lives in the `doc/` of the repository whose code it describes, and
   this repository only collects, orders and publishes it.
 - **Before a commit, build the site** with `build/assemble.py` and `mkdocs build --strict`, as the README shows.
+- **No test here reads a document of this repository**: `tests/` writes the pages it checks into temporary
+  directories, so there is nothing to tag `documents` until a test reads one.
 
 ## Shared across the Sokar repositories
 
-> **BEGIN Shared Area** · sha256 `6f50f80a2fb6ec54` · changed 2026-10-05T09:30Z
+> **BEGIN Shared Area** · sha256 `9a3c3ef49781a5b6` · changed 2026-10-06T06:00Z
 
 Identical in every repository `project.yml` names. The markers carry the SHA-256 of the lines between
 them (the first 16 hex digits) and the UTC time that text last changed; change it in the channel
@@ -135,7 +137,9 @@ first, never in one copy.
 - **Before a commit, the full suite runs as its own step and its result is read.** A commit is gated
   on the exit code, never on grepped output, and never chained onto the test run.
 - **A change handed over says which test levels actually ran** - unit tests, local VM, rented
-  machine - never which ought to have. A change to documents or issues only needs the unit tests.
+  machine - never which ought to have. A change to documents or issues only needs the tests tagged
+  `documents`, which run alone; every test that reads a document carries that tag, and a test fails
+  when one does not.
 - **A test result names every skipped test**, never just a count.
 - **A failing check prints what it asked and what it got, never a guessed cause**, and its failure
   path has been made to happen once and read.
@@ -232,4 +236,4 @@ first, never in one copy.
 - **Every native executable is built with `-march=x86-64`**, so it starts on any x86-64 CPU, and the
   build checks each executable for exactly that instruction set.
 
-> **END Shared Area** · sha256 `6f50f80a2fb6ec54`
+> **END Shared Area** · sha256 `9a3c3ef49781a5b6`

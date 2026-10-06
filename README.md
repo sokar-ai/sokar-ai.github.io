@@ -39,7 +39,7 @@ python3 -m venv .venv && .venv/bin/pip install --no-deps --require-hashes -r bui
 
 It reads the other repositories and writes this repository's Pages; nothing else.
 
-- **Built and checked from now on, published after PJ18** (the operator, 2026-10-04): every run builds the whole
+- **Built and checked from now on, published once the repositories are public** (the operator, 2026-10-04): every run builds the whole
   site strict; the deploy runs only where the repository variable `PUBLISH` is `true`, set once the repositories
   are public.
 - **Its one secret, until then:** `SOKAR_DOCS_READ`, a fine-grained token with **Contents: read** (and the

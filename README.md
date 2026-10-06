@@ -1,5 +1,10 @@
 # sokar-ai.github.io
 
+<img src="doc/images/early-bird.svg" width="350" alt="Early bird - work in progress">
+
+> **Early bird - work in progress.** Sokar is not stable yet: until release 1.0.0, its code, commands
+> and file formats can change without notice.
+
 The documentation of every part of Sokar as one site: **<https://sokar-ai.github.io>**.
 
 Nothing here is written by hand except how the site is put together. Each repository keeps its documentation in

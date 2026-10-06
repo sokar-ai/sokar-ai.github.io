@@ -154,6 +154,30 @@ class AssembleTest(unittest.TestCase):
         self.assertTrue(all("prefers-color-scheme" in scheme["media"] for scheme in theme["palette"]))
         self.assertIn("search", config["plugins"])
 
+    def test_the_home_page_opens_with_the_early_bird_and_its_note(self):
+        def readable(name, url, where):
+            os.makedirs(os.path.join(where, "doc"))
+            with open(os.path.join(where, "doc", "index.md"), "w", encoding="utf-8") as page:
+                page.write(f"# {name}\n")
+            return {"name": name, "ref": "main", "commit": "0" * 40}
+
+        project = {"repositories": {}}
+        parts = [("sokar-project", "https://github.com/sokar-ai/sokar-project.git", "")]
+        with tempfile.TemporaryDirectory() as out, \
+                mock.patch.object(assemble, "parts", return_value=parts), \
+                mock.patch.object(assemble, "fetch", side_effect=readable):
+            assemble.assemble(os.path.join(out, "site"), project, {})
+            with open(os.path.join(out, "site", "docs", "index.md"), encoding="utf-8") as file:
+                home = file.read().split("\n")
+            graphic = os.path.join(out, "site", "docs", "images", "early-bird.svg")
+            self.assertTrue(os.path.isfile(graphic), "the graphic the home page names is in the site")
+
+        self.assertEqual(home[0], "# Sokar")
+        self.assertEqual(home[2], '<img src="images/early-bird.svg" width="350" alt="Early bird - work in progress">')
+        self.assertEqual(home[4], "> **Early bird - work in progress.** Sokar is not stable yet: until release 1.0.0,"
+                                  " its code, commands")
+        self.assertEqual(home[5], "> and file formats can change without notice.")
+
     def test_every_repository_read_builds(self):
         def readable(name, url, where):
             os.makedirs(os.path.join(where, "doc"))

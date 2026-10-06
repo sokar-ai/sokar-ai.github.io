@@ -133,6 +133,9 @@ THEME = {
 # What a page shows besides its text. Anything else in doc/ - a walk's JSON, a fixture - is not for the site.
 ASSETS = (".png", ".svg", ".jpg", ".jpeg", ".gif", ".webp")
 
+# The early-bird graphic the home page shows, kept here rather than taken from a repository the site reads.
+EARLY_BIRD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "doc", "images", "early-bird.svg")
+
 LINK = re.compile(r"(\]\()([^)\s]+)(\))")
 
 # A link inside raw HTML: MkDocs moves a Markdown link for a page that becomes a directory, but not one of these.
@@ -205,7 +208,8 @@ def prefixed(nav, name):
 def assemble(out, project, local):
     docs = os.path.join(out, "docs")
     shutil.rmtree(out, ignore_errors=True)
-    os.makedirs(docs)
+    os.makedirs(os.path.join(docs, "images"))
+    shutil.copyfile(EARLY_BIRD, os.path.join(docs, "images", "early-bird.svg"))
     # Every repository read, with or without doc/: what an hourly run compares, so one with nothing to show does not
     # look changed at every hour.
     built, considered, unread, nav = [], [], [], [{"Sokar": "index.md"}]
@@ -265,6 +269,9 @@ def assemble(out, project, local):
 
 def landing(built):
     lines = ["# Sokar", "",
+             '<img src="images/early-bird.svg" width="350" alt="Early bird - work in progress">', "",
+             "> **Early bird - work in progress.** Sokar is not stable yet: until release 1.0.0, its code, commands",
+             "> and file formats can change without notice.", "",
              "Sokar runs AI coding agents in containers they cannot leave. This site holds the documentation of",
              "every part of it, each taken from its own repository.", "",
              "| Part | What it is | Taken from |", "|---|---|---|"]

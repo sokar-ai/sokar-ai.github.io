@@ -7,7 +7,7 @@
 # build. That is how a push reaches the site within the hour without any other repository holding a token that
 # could write here.
 #
-# Publishing is off until the repositories are public (PJ18; the operator, 2026-10-04): the site is built and
+# Publishing is off until the repositories are public (the operator, 2026-10-04): the site is built and
 # checked from now on, and published only where the repository variable PUBLISH is 'true'. Until then the
 # repositories are read with SOKAR_DOCS_READ, a fine-grained token with Contents: read on them and nothing else;
 # once they are public the token goes, and so does every line that names it.
@@ -121,7 +121,7 @@ jobs:
 
   publish:
     needs: build
-    # Off until PJ18: set the repository variable PUBLISH to 'true' once the repositories are public.
+    # Off until the repositories are public: set the repository variable PUBLISH to 'true' once they are.
     if: github.ref == 'refs/heads/main' && vars.PUBLISH == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10

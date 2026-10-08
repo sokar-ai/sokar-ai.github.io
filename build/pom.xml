@@ -12,7 +12,7 @@
 
     <properties>
         <!-- The shared build tools, from sokar-ai/sokar-buildtools on Central. -->
-        <sokar.buildtools.version>0.4.1</sokar.buildtools.version>
+        <sokar.buildtools.version>0.4.3</sokar.buildtools.version>
     </properties>
 
     <dependencies>

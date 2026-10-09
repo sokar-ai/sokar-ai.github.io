@@ -1,7 +1,8 @@
 # Checks the documents: AGENTS.md's shared block against its hash, and no citation of an issue that goes stale, with
 # the shared build tools from Central. Of its own because the site's build is about other repositories' pages, and it
 # leases no machine.
-name: Shared rules
+name: Shared rules check
+run-name: "${{ github.workflow }} · ${{ github.ref_name }}: ${{ github.event.head_commit.message || github.event.pull_request.title || github.workflow }}"
 
 on:
   push:

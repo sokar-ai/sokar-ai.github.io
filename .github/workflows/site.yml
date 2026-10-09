@@ -11,7 +11,8 @@
 # checked from now on, and published only where the repository variable PUBLISH is 'true'. Until then the
 # repositories are read with SOKAR_DOCS_READ, a fine-grained token with Contents: read on them and nothing else;
 # once they are public the token goes, and so does every line that names it.
-name: Site
+name: Documentation site
+run-name: "${{ github.workflow }} · ${{ github.ref_name }}: ${{ github.event.head_commit.message || github.event.pull_request.title || github.workflow }}"
 
 on:
   schedule:

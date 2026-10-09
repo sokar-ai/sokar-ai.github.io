@@ -255,7 +255,7 @@ def assemble(out, project, local):
         nav.append({name: section})
     unread_stops(unread)
     with open(os.path.join(docs, "index.md"), "w", encoding="utf-8") as index:
-        index.write(landing(built))
+        index.write(landing(built, docs))
     with open(os.path.join(docs, "parts.json"), "w", encoding="utf-8") as manifest:
         json.dump(considered, manifest, indent=1)
     config = {"site_name": "Sokar", "site_url": SITE_URL, "repo_url": f"https://github.com/{ORG}",
@@ -267,11 +267,35 @@ def assemble(out, project, local):
     return built
 
 
-def landing(built):
+# A way in for each kind of reader, under the early bird (approved by the operator, 2026-10-09). An entry shows only
+# when its page is among the parts taken: a link to a page a repository does not have yet would fail the strict build,
+# and the entry appears by itself once the page is pushed.
+WAYS_IN = [
+    ("If you have thirty seconds", "The elevator pitch", "core/pitch.md",
+     "what Sokar is, in a few sentences to remember."),
+    ("If you have ten minutes", "How it works", "core/how-it-works.md",
+     "the parts, and what happens when a task starts."),
+    ("If you look after security", "Sokar in a company", "core/corporate-security.md",
+     "what a task can reach, what it never holds, and what the host guarantees."),
+    ("If you want to build it with us", "Contributing", f"{PROJECT}/contributing.md",
+     "how a change gets in, the rules, the licence."),
+]
+
+
+def ways_in(docs):
+    lines = []
+    for heading, title, page, what in WAYS_IN:
+        if os.path.isfile(os.path.join(docs, page)):
+            # Two spaces: a line break, so the link stands under its heading rather than beside it.
+            lines += [f"**{heading}**  ", f"[{title}]({page}) - {what}", ""]
+    return lines
+
+
+def landing(built, docs):
     lines = ["# Sokar", "",
              '<img src="images/early-bird.svg" width="350" alt="Early bird - work in progress">', "",
              "> **Early bird - work in progress.** Sokar is not stable yet: until release 1.0.0, its code, commands",
-             "> and file formats can change without notice.", "",
+             "> and file formats can change without notice.", ""] + ways_in(docs) + [
              "Sokar runs AI coding agents in containers they cannot leave. This site holds the documentation of",
              "every part of it, each taken from its own repository.", "",
              "| Part | What it is | Taken from |", "|---|---|---|"]

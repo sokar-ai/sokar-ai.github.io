@@ -178,6 +178,40 @@ class AssembleTest(unittest.TestCase):
                                   " its code, commands")
         self.assertEqual(home[5], "> and file formats can change without notice.")
 
+    def test_the_home_page_offers_a_way_in_for_each_reader_whose_page_is_there(self):
+        pages = {"core": ["index.md", "pitch.md", "how-it-works.md", "corporate-security.md"],
+                 "sokar-project": ["index.md"]}
+
+        def readable(name, url, where):
+            os.makedirs(os.path.join(where, "doc"))
+            for page in pages[name]:
+                with open(os.path.join(where, "doc", page), "w", encoding="utf-8") as file:
+                    file.write(f"# {page}\n")
+            return {"name": name, "ref": "main", "commit": "0" * 40}
+
+        parts = [("core", "https://github.com/sokar-ai/sokar.git", ""),
+                 ("sokar-project", "https://github.com/sokar-ai/sokar-project.git", "")]
+
+        def home():
+            with tempfile.TemporaryDirectory() as out, \
+                    mock.patch.object(assemble, "parts", return_value=parts), \
+                    mock.patch.object(assemble, "fetch", side_effect=readable):
+                assemble.assemble(os.path.join(out, "site"), {"repositories": {}}, {})
+                with open(os.path.join(out, "site", "docs", "index.md"), encoding="utf-8") as file:
+                    return file.read()
+
+        text = home()
+        self.assertIn("**If you have thirty seconds**", text)
+        self.assertIn("[The elevator pitch](core/pitch.md)", text)
+        self.assertIn("[How it works](core/how-it-works.md)", text)
+        self.assertIn("[Sokar in a company](core/corporate-security.md)", text)
+        self.assertNotIn("If you want to build it with us", text, "hidden while sokar-project has no contributing page")
+        self.assertLess(text.index("Early bird"), text.index("If you have thirty seconds"))
+        self.assertLess(text.index("If you have thirty seconds"), text.index("Sokar runs AI coding agents"))
+
+        pages["sokar-project"].append("contributing.md")
+        self.assertIn("[Contributing](sokar-project/contributing.md)", home(), "shown once the page is there")
+
     def test_every_repository_read_builds(self):
         def readable(name, url, where):
             os.makedirs(os.path.join(where, "doc"))

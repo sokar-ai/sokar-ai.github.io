@@ -35,7 +35,7 @@ class GitTest(unittest.TestCase):
 class PartsTest(unittest.TestCase):
 
     def test_the_project_comes_last_and_its_repositories_in_their_order(self):
-        # The operator's word: the project's own repository is organizational, of little interest to a user.
+        # Decided: the project's own repository is organizational, of little interest to a user.
         project = {"project": {"description": "the project"},
                    "repositories": {
                        "core": {"upstream": "git@github.com:sokar-ai/sokar.git"},
@@ -79,7 +79,7 @@ class RelinkedTest(unittest.TestCase):
 class FetchTest(unittest.TestCase):
 
     def test_takes_the_default_branch_even_when_a_release_is_tagged(self):
-        # The operator's word: the site shows what is on main, so new pages appear within the hour of a push.
+        # Decided: the site shows what is on main, so new pages appear within the hour of a push.
         with tempfile.TemporaryDirectory() as tmp:
             repository = os.path.join(tmp, "repository")
             subprocess.run(["git", "init", "-q", "-b", "main", repository], check=True)

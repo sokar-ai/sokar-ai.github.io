@@ -92,7 +92,7 @@ def https(upstream):
 def parts(project):
     """Every repository the project names, in its order, and the project's own repository last.
 
-    Last because it is organizational, of little interest to someone who uses Sokar (the operator, 2026-10-05); the
+    Last because it is organizational, of little interest to someone who uses Sokar (2026-10-05); the
     menu and the start page follow this order.
     """
     found = []
@@ -267,7 +267,7 @@ def assemble(out, project, local):
     return built
 
 
-# A way in for each kind of reader, under the early bird (approved by the operator, 2026-10-09). An entry shows only
+# A way in for each kind of reader, under the early bird (approved 2026-10-09). An entry shows only
 # when its page is among the parts taken: a link to a page a repository does not have yet would fail the strict build,
 # and the entry appears by itself once the page is pushed.
 WAYS_IN = [
